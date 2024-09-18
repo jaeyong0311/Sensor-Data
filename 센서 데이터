@@ -1,0 +1,146 @@
+#include <DHT.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define DHTPIN 13
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+#define SCREEN_WIDTH 128  // OLED 디스플레이 너비, 픽셀 단위
+#define SCREEN_HEIGHT 64  // OLED 디스플레이 높이, 픽셀 단위
+
+#define OLED_RESET 4
+#define SCREEN_ADDRESS 0x3C
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+#define WATERSENSOR A0
+#define DUST_LED_PIN 18
+#define DUST_MEASURE_PIN 19
+#define LIGHTSENSOR A3  // 여기를 A2에서 A3로 변경합니다.
+
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println(F("SSD1306 할당 실패"));
+    for (;;)
+      ;
+
+    pinMode(DUST_LED_PIN, OUTPUT);
+  }
+}
+
+// 수위 센서를 읽는 함수
+float readWaterLevel() {
+  int waterValue = analogRead(WATERSENSOR);
+  float waterLevel = map(waterValue, 0, 1023, 0, 100);
+  return waterLevel;
+}
+
+// 온습도를 읽는 함수
+void readTemperatureAndHumidity(float& temperature, float& humidity) {
+  temperature = dht.readTemperature();
+  humidity = dht.readHumidity();
+}
+
+// 미세먼지를 읽는 함수
+float readDustDensity() {
+  digitalWrite(DUST_LED_PIN, LOW);
+  delayMicroseconds(280);
+  int voMeasured = analogRead(DUST_MEASURE_PIN);
+  delayMicroseconds(40);
+  digitalWrite(DUST_LED_PIN, HIGH);
+  delayMicroseconds(9680);
+  float calcVoltage = voMeasured * (3.3 / 4095);
+  float dustDensity = 170 * calcVoltage - 0.1;
+  if (dustDensity <= 0) dustDensity = 0;
+  return dustDensity;
+}
+
+// 조도 센서를 읽는 함수
+int readLightSensor() {
+  int lightValue = analogRead(LIGHTSENSOR);
+  return lightValue;
+}
+
+// 첫 번째 페이지를 출력하는 함수
+void displayPage1() {
+  float waterLevel = readWaterLevel();
+
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(WHITE, 0);
+  display.setCursor(0, 0);
+  display.print("water: ");
+  display.print(waterLevel);
+  display.print(" %");
+  display.display();
+}
+
+// 두 번째 페이지를 출력하는 함수
+void displayPage2() {
+  float temperature, humidity;
+  readTemperatureAndHumidity(temperature, humidity);
+
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(WHITE, 0);
+  display.setCursor(0, 0);
+  display.print("temp: ");
+  display.print(temperature);
+  display.print(" C");
+  display.setCursor(0, 16);
+  display.print("humi: ");
+  display.print(humidity);
+  display.print(" %");
+  display.display();
+}
+
+// 세 번째 페이지를 출력하는 함수
+void displayPage3() {
+  float dustDensity = readDustDensity();
+
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(WHITE, 0);
+  display.setCursor(0, 0);
+  display.print("dust: ");
+  display.print(dustDensity);
+  display.println(" ug/m3");
+  display.display();
+}
+
+// 네 번째 페이지를 출력하는 함수
+void displayPage4() {
+  int lightValue = readLightSensor();
+
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(WHITE, 0);
+  display.setCursor(0, 0);
+  display.print("illuminance: ");
+  display.print(lightValue);
+  display.display();
+}
+
+void loop() {
+  // 첫 번째 페이지 출력
+  displayPage1();
+  delay(2000); // 2초 대기, 첫 번째 페이지를 보여주고 대기
+
+  // 두 번째 페이지 출력
+  displayPage2();
+  delay(2000); // 2초 대기, 두 번째 페이지를 보여주고 대기
+
+  // 세 번째 페이지 출력
+  displayPage3();
+  delay(2000); // 2초 대기, 세 번째 페이지를 보여주고 대기
+
+  // 네 번째 페이지 출력
+  displayPage4();
+  delay(2000); // 2초 대기, 네 번째 페이지를 보여주고 대기
+
+  // 필요에 따라 더 많은 페이지를 추가하고, 딜레이를 조정할 수 있습니다.
+}
